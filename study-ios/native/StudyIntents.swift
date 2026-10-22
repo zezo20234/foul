@@ -6,6 +6,7 @@ extension Notification.Name {
     static let studyLiveAction = Notification.Name("studyLiveAction")
 }
 
+@available(iOS 17.0, *)
 struct TogglePauseIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Pause or resume"
     func perform() async throws -> some IntentResult {
@@ -26,6 +27,7 @@ struct TogglePauseIntent: LiveActivityIntent {
     }
 }
 
+@available(iOS 17.0, *)
 struct SkipIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Skip phase"
     func perform() async throws -> some IntentResult {

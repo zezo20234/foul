@@ -5,7 +5,7 @@ app = project.targets.find { |t| t.name == 'App' }
 raise 'App target not found' unless app
 app_id = app.build_configurations.first.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] || 'com.yourname.studytogether'
 
-app.build_configurations.each { |c| c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0' }
+app.build_configurations.each { |c| c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.2' }
 
 app_group = project.main_group.find_subpath('App', false)
 raise 'App group not found' unless app_group
@@ -16,7 +16,7 @@ raise 'App group not found' unless app_group
 end
 app.resources_build_phase.add_file_reference(app_group.new_file('alarm.wav'))
 
-widget = project.new_target(:app_extension, 'StudyWidget', :ios, '17.0')
+widget = project.new_target(:app_extension, 'StudyWidget', :ios, '16.2')
 wg = project.main_group.new_group('StudyWidget', 'StudyWidget')
 %w[StudyWidget.swift StudyAttributes.swift StudyIntents.swift].each do |f|
   widget.add_file_references([wg.new_file(f)])
@@ -29,7 +29,7 @@ widget.build_configurations.each do |c|
   s['INFOPLIST_FILE'] = 'StudyWidget/Info.plist'
   s['GENERATE_INFOPLIST_FILE'] = 'NO'
   s['SWIFT_VERSION'] = '5.0'
-  s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '16.2'
   s['TARGETED_DEVICE_FAMILY'] = '1,2'
   s['SKIP_INSTALL'] = 'YES'
   s['PRODUCT_NAME'] = '$(TARGET_NAME)'

@@ -25,16 +25,18 @@ struct TimerLabel: View {
 struct Controls: View {
     let paused: Bool
     var body: some View {
-        HStack(spacing: 12) {
-            Button(intent: TogglePauseIntent()) {
-                Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 48, height: 30)
+        if #available(iOS 17.0, *) {
+            HStack(spacing: 12) {
+                Button(intent: TogglePauseIntent()) {
+                    Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 48, height: 30)
+                }
+                Button(intent: SkipIntent()) {
+                    Image(systemName: "forward.fill").frame(width: 48, height: 30)
+                }
             }
-            Button(intent: SkipIntent()) {
-                Image(systemName: "forward.fill").frame(width: 48, height: 30)
-            }
+            .buttonStyle(.bordered)
+            .tint(.white)
         }
-        .buttonStyle(.bordered)
-        .tint(.white)
     }
 }
 
