@@ -22,9 +22,26 @@ struct TimerLabel: View {
     }
 }
 
+struct Controls: View {
+    let paused: Bool
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(intent: TogglePauseIntent()) {
+                Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 48, height: 30)
+            }
+            Button(intent: SkipIntent()) {
+                Image(systemName: "forward.fill").frame(width: 48, height: 30)
+            }
+        }
+        .buttonStyle(.bordered)
+        .tint(.white)
+    }
+}
+
 struct StudyLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: StudyAttributes.self) { context in
+            VStack(spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(context.state.paused ? "Paused" : context.state.phase).font(.headline)
@@ -35,6 +52,8 @@ struct StudyLiveActivity: Widget {
                 }
                 Spacer()
                 TimerLabel(state: context.state).font(.system(size: 40, weight: .light))
+            }
+            Controls(paused: context.state.paused)
             }
             .padding()
             .activityBackgroundTint(Color(red: 0.06, green: 0.46, blue: 0.43))
@@ -49,7 +68,11 @@ struct StudyLiveActivity: Widget {
                     TimerLabel(state: context.state).font(.title2)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.state.cycleText).font(.caption)
+                    HStack {
+                        Text(context.state.cycleText).font(.caption)
+                        Spacer()
+                        Controls(paused: context.state.paused)
+                    }
                 }
             } compactLeading: {
                 Image(systemName: "clock")

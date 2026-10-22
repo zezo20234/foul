@@ -8,8 +8,27 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "LiveActivity"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAlarms", returnType: CAPPluginReturnPromise)
     ]
+
+    public override func load() {
+        NotificationCenter.default.addObserver(forName: .studyLiveAction, object: nil, queue: .main) { [weak self] note in
+            let action = (note.userInfo?["action"] as? String) ?? ""
+            self?.notifyListeners("liveAction", data: ["action": action], retainUntilConsumed: true)
+        }
+    }
+
+    @objc func setAlarms(_ call: CAPPluginCall) {
+        let raw = call.getArray("alarms", JSObject.self) ?? []
+        let items: [(Double, String)] = raw.map {
+            (($0["endMs"] as? NSNumber)?.doubleValue ?? 0, ($0["title"] as? String) ?? "Timer finished")
+        }
+        Task {
+            let ok = await AlarmBridge.set(items)
+            call.resolve(["scheduled": ok])
+        }
+    }
 
     @objc func start(_ call: CAPPluginCall) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
