@@ -10,47 +10,15 @@ jobs:
     runs-on: macos-14
     defaults:
       run:
-        working-directory: study-together-ios/study-ios
+        working-directory: study-ios
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Create iOS project
-        run: npx cap add ios
-
-      - name: Use your icon (upscaled to 1024)
-        run: |
-          sips -z 1024 1024 www/icon-512.png --out ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png || true
-
-      - name: Sync web files
-        run: npx cap sync ios
-
-      - name: Build (no signing)
-        run: |
-          xcodebuild \
-            -workspace ios/App/App.xcworkspace \
-            -scheme App \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            build
-
-      - name: Package .ipa
-        run: |
-          mkdir Payload
-          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
-          zip -qr StudyTogether.ipa Payload
-
+      - name: Build
+        run: bash native/build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: StudyTogether-ipa
-          path: study-together-ios/study-ios/StudyTogether.ipa
+          path: study-ios/StudyTogether.ipa
