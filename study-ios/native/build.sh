@@ -1,59 +1,51 @@
-#!/bin/bash
-# Builds an unsigned StudyTogether.ipa. Run from the folder that contains www/ and native/.
+#!/usr/bin/env bash
+# Builds an UNSIGNED StudyTogether.ipa. Run from anywhere; output: study-ios/StudyTogether.ipa
 set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
-# use the newest Xcode installed on the runner (AlarmKit needs the iOS 26+ SDK)
-XC=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-sudo xcode-select -s "$XC/Contents/Developer"
+echo "==> Selecting Xcode"
+for x in /Applications/Xcode_16.2.app /Applications/Xcode_16.1.app /Applications/Xcode_16.0.app /Applications/Xcode_16.app; do
+  if [ -d "$x" ]; then sudo xcode-select -s "$x"; break; fi
+done
 xcodebuild -version
 
-npm install
-npx cap add ios
-sips -z 1024 1024 www/icon-512.png --out ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png || true
-npx cap sync ios
+echo "==> Installing JS deps (Capacitor + plugins)"
+npm install --no-audit --no-fund
 
-# native code, alarm sound, Live Activity widget
-cp native/ViewController.swift native/LiveActivityPlugin.swift native/StudyAttributes.swift native/StudyIntents.swift native/AlarmBridge.swift native/alarm.wav ios/App/App/
-mkdir -p ios/App/StudyWidget
-cp native/StudyWidget.swift native/StudyAttributes.swift native/StudyIntents.swift ios/App/StudyWidget/
-cp native/StudyWidget-Info.plist ios/App/StudyWidget/Info.plist
-ruby -e 'require "xcodeproj"' 2>/dev/null || sudo gem install xcodeproj --no-document
-ruby native/setup_xcode.rb
+echo "==> Installing xcodegen + ldid"
+brew install xcodegen ldid
 
-# Info.plist: Live Activities + background audio
-PB=/usr/libexec/PlistBuddy
-PL=ios/App/App/Info.plist
-$PB -c "Add :NSSupportsLiveActivities bool true" "$PL" || true
-$PB -c "Add :UIBackgroundModes array" "$PL" || true
-$PB -c "Add :UIBackgroundModes:0 string audio" "$PL" || true
-$PB -c "Add :NSAlarmKitUsageDescription string Rings an alarm when your study timer ends." "$PL" || true
+echo "==> Copying web app into the native project"
+rm -rf native/gen && mkdir -p native/gen
+cp -R www native/gen/public
+cp capacitor.config.json native/gen/capacitor.config.json
 
-# use our ViewController (registers the Live Activity plugin)
-SB=ios/App/App/Base.lproj/Main.storyboard
-sed -i '' -E 's/customClass="CAPBridgeViewController"( customModule="Capacitor")?/customClass="ViewController" customModule="App"/' "$SB"
-grep -q 'customClass="ViewController"' "$SB" || { echo "Storyboard was not patched:"; grep -n customClass "$SB"; exit 1; }
+echo "==> Generating Xcode project"
+cd native
+xcodegen generate
 
-build() {
-  xcodebuild \
-    -workspace ios/App/App.xcworkspace \
-    -scheme App \
-    -configuration Release \
-    -sdk iphoneos \
-    -derivedDataPath build \
-    CODE_SIGNING_ALLOWED=NO \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGN_IDENTITY="" \
-    build
-}
-if ! build; then
-  echo "=== AlarmKit DISABLED: first build failed, retrying without system alarms ==="
-  cp native/AlarmBridgeStub.swift ios/App/App/AlarmBridge.swift
+echo "==> Building (unsigned)"
+rm -rf "$ROOT/build"
+xcodebuild \
+  -project StudyTogether.xcodeproj \
+  -scheme App \
+  -configuration Release \
+  -sdk iphoneos \
+  -destination 'generic/platform=iOS' \
+  -derivedDataPath "$ROOT/build" \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
   build
-  echo "=== AlarmKit DISABLED: built without system alarms (notification alarm is used instead) ==="
-fi
 
-rm -rf Payload StudyTogether.ipa
-mkdir Payload
-cp -R build/Build/Products/Release-iphoneos/App.app Payload/
-zip -qr StudyTogether.ipa Payload
-echo "Built StudyTogether.ipa"
+APP="$ROOT/build/Build/Products/Release-iphoneos/App.app"
+test -d "$APP"
+
+echo "==> Embedding Screen Time entitlement (re-signing tools such as Sideloadly/AltStore read it)"
+ldid -SApp.entitlements "$APP/App" || echo "ldid step skipped"
+
+echo "==> Packaging IPA"
+rm -rf "$ROOT/Payload" "$ROOT/StudyTogether.ipa"
+mkdir "$ROOT/Payload"
+cp -R "$APP" "$ROOT/Payload/"
+(cd "$ROOT" && zip -qry StudyTogether.ipa Payload && rm -rf Payload)
+ls -lh "$ROOT/StudyTogether.ipa"

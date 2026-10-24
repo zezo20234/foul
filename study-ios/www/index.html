@@ -661,7 +661,7 @@ document.getElementById('you').addEventListener('change',async e=>{
  if(t==='block'){
   if(e.target.checked){
    try{if(LN)await LN.requestPermissions()}catch(x){}
-   try{await ST.requestAuthorization();const r=await ST.getStatus();if(!(r.apps+r.sites+r.categories))await ST.pickApps();stOn=true}catch(x){stOn=false;e.target.checked=false;toast('Screen Time was not allowed')}
+   try{await ST.requestAuthorization();const r=await ST.getStatus();if(!(r.apps+r.sites+r.categories))await ST.pickApps();stOn=true}catch(x){stOn=false;e.target.checked=false;toast('Screen Time: '+((x&&x.message)||'not allowed'))}
   }else stOn=false;
   try{localStorage.setItem('st_block',stOn?'1':'0')}catch(x){} stStatus();
  }
@@ -679,4 +679,26 @@ async function pushInit(){
 }
 setTimeout(pushInit,4000);
 
+
+/* ---------- update popup (Firebase: config/update = {id, message, url}) ---------- */
+(function(){
+ const SEEN='upd_seen';let shown=false;
+ const openSafari=async u=>{try{const U=isNative?NP('Updater'):null;if(U){await U.openUrl({url:u});return}}catch(e){}window.open(u,'_blank')};
+ onValue(ref(db,'config/update'),snap=>{
+  const d=snap.val();if(!d||!d.id||typeof d.url!=='string'||!/^https?:\/\//i.test(d.url))return;
+  let seen='';try{seen=localStorage.getItem(SEEN)||''}catch(e){}
+  if(String(d.id)===seen||shown)return;shown=true;
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;font-family:-apple-system,system-ui,sans-serif';
+  const b=document.createElement('div');
+  b.style.cssText='background:#fff;color:#1c1e21;border-radius:16px;padding:22px;max-width:340px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3)';
+  const h=document.createElement('div');h.textContent='Update available';h.style.cssText='font-size:19px;font-weight:700;margin-bottom:8px';
+  const m=document.createElement('div');m.textContent=d.message||'A new version of Study Together is available.';m.style.cssText='font-size:15px;color:#6b7075;margin-bottom:18px;line-height:1.4';
+  const up=document.createElement('button');up.textContent='Update';up.style.cssText='display:block;width:100%;padding:13px;border:0;border-radius:10px;background:#0f766e;color:#fff;font-size:16px;font-weight:600;margin-bottom:8px';
+  const lt=document.createElement('button');lt.textContent='Later';lt.style.cssText='display:block;width:100%;padding:11px;border:0;background:none;color:#6b7075;font-size:15px';
+  up.onclick=()=>{try{localStorage.setItem(SEEN,String(d.id))}catch(e){}openSafari(d.url);o.remove();shown=false};
+  lt.onclick=()=>{o.remove()};
+  b.append(h,m,up,lt);o.append(b);document.body.append(o);
+ });
+})();
 </script></main></body></html>

@@ -1,19 +1,10 @@
 {
-  "name": "study-together-ios",
+  "name": "study-together",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "ios:add": "npx cap add ios",
-    "ios:sync": "npx cap sync ios",
-    "ios:open": "npx cap open ios"
-  },
   "dependencies": {
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/haptics": "^6.0.0",
-    "@capacitor/local-notifications": "^6.0.0",
-    "@capacitor/ios": "^6.0.0"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.0.0"
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0"
   }
 }
