@@ -221,7 +221,7 @@ let me=null,stats={},room=null,members={},unsubs=[];
 const ROOMS=[{id:'lounge',name:'Study Lounge',d:'First one in picks the Pomodoro for everyone.',m:1},{id:'library',name:'Quiet Library',d:'First one in picks the Pomodoro for everyone.',m:1},{id:'open',name:'Open Study',d:'Just study together. Everyone runs their own timer.',m:0}];
 let lockMode=false,info={},roomOffs=[],pickFor=null,svOff=0,rt=null,adv=0,sp=null,allUsers={},adSel=null,adOff=null;
 const T={mode:'25/5',cycles:4,subject:'',phase:'idle',cycle:1,running:false,end:0,left:1500,focusBase:0,focusSince:0,lastLog:0};
-let updOff=null,updShown=false,updSnooze=0,updCur=null,FW={},seenN={},sumSecs=null,sumEarly=false,lastNudge={},stOn=false,stBlocked=false; /* declared early: enter() runs at load */
+let gotStats=false,gotSince=0,gotTry=0,updOff=null,updShown=false,updSnooze=0,updCur=null,FW={},seenN={},sumSecs=null,sumEarly=false,lastNudge={},stOn=false,stBlocked=false; /* declared early: enter() runs at load */
 const dur=()=>MODES[T.mode][T.phase==='break'?1:0]*60;
 
 /* ---------- accounts stored in Realtime Database (salted PBKDF2 hash, never the plain password) ---------- */
@@ -233,9 +233,17 @@ async function hash(u,p){
 }
 let statsOff=null;
 function enter(u){
- me={uid:u,name:u};try{localStorage.setItem('st_user',u)}catch(e){}
+ gotStats=false;gotSince=0;gotTry=0;me={uid:u,name:u};try{localStorage.setItem('st_user',u)}catch(e){}
  $('#auth').classList.add('hide');$('#app').classList.remove('hide');$('#who').textContent=u;startRoomInfo();adminInit();
- statsOff=onValue(ref(db,`users/${u}`),s=>{stats=s.val()||{};drawStats();drawSubjects();if(sumSecs!=null)renderSum()});
+ statsOff=onValue(ref(db,`users/${u}`),s=>{gotStats=true;stats=s.val()||{};drawStats();drawSubjects();if(sumSecs!=null)renderSum()});
+}
+/* re-subscribe everything without reloading the page (the iPhone app can come back blank after a full reload) */
+function softRefresh(){
+ if(!me)return;const u=me.uid;
+ try{flush()}catch(e){}
+ if(statsOff){try{statsOff()}catch(e){}statsOff=null}
+ roomOffs.forEach(f=>{try{f()}catch(e){}});roomOffs=[];if(adOff){try{adOff()}catch(e){}adOff=null}
+ const keep=gotTry;enter(u);gotTry=keep;
 }
 function check(){const u=uname($('#u').value),p=$('#p').value;aerr('');
  if(!/^[a-z0-9_]{2,16}$/.test(u)){aerr('Username: 2–16 letters, numbers or _.');return null}
@@ -249,7 +257,8 @@ $('#su').onclick=async()=>{const c=check();if(!c)return;
   await set(ref(db,`users/${c[0]}/name`),c[0]);enter(c[0])}catch(x){aerr(x.message)}};
 $('#out').onclick=async()=>{await leave();if(statsOff){statsOff();statsOff=null}try{localStorage.removeItem('st_user')}catch(e){}
  roomOffs.forEach(f=>f());roomOffs=[];if(adOff){adOff();adOff=null}$('#adtab').classList.add('hide');adSel=null;document.querySelector('nav button').click();me=null;stats={};$('#p').value='';$('#app').classList.add('hide');$('#auth').classList.remove('hide')};
-try{const u=localStorage.getItem('st_user');if(u)enter(u)}catch(e){}
+/* run after the whole script has been evaluated, so nothing below can still be uninitialised when enter() runs */
+try{const u=localStorage.getItem('st_user');if(u)setTimeout(()=>{try{enter(u)}catch(e){console.error(e)}},0)}catch(e){}
 
 /* ---------- tabs ---------- */
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
@@ -375,6 +384,7 @@ $('#go').onclick=()=>{if(lockMode)return T.spect?joinFocus():sGo();if(!T.running
 $('#skip').onclick=()=>{if(lockMode)return;if(T.phase==='idle'||T.phase==='done')return;if(!T.running){T.running=true;T.end=Date.now();if(T.phase==='focus')T.focusSince=T.lastLog=Date.now()}else T.end=Date.now();finish();drawTimer()};
 $('#rf').onclick=async()=>{
  flush();
+ if(isNative){softRefresh();toast('Refreshed');return}
  try{
   if('serviceWorker' in navigator){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()))}
   if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
@@ -694,7 +704,7 @@ setTimeout(pushInit,4000);
    An app cannot re-sign itself: the real 7-day reset only happens when the user reinstalls
    with iLoader / SideStore. The page's last step is a confirm button that resets the local timer.
    ===================================================================================== */
-const IOS_UPDATE_URL='';/* optional default install link, e.g. 'sidestore://install?url=https://github.com/YOU/REPO/releases/latest/download/StudyTogether.ipa' */
+const IOS_UPDATE_URL='https://github.com/zezo20234/pomodoro/releases/latest/download/StudyTogether.ipa';/* optional default install link, e.g. 'sidestore://install?url=https://github.com/YOU/REPO/releases/latest/download/StudyTogether.ipa' */
 const REFRESH_DAYS=6,EXPIRE_DAYS=7,DAY=86400000;
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}return null};
 function refreshedAt(){let t=+ls('st_refreshed');if(!t){t=Date.now();ls('st_refreshed',t)}return t}
@@ -766,6 +776,8 @@ function adminUpdCard(){
  };
 }
 setInterval(()=>{
+ /* watchdog: if the stats never arrive after (re)loading, re-subscribe */
+ if(me&&!gotStats){if(!gotSince)gotSince=Date.now();else if(Date.now()-gotSince>6000&&gotTry<3){gotTry++;gotSince=Date.now();softRefresh()}}
  if(me&&!updOff){startUpd();scheduleExpiryNote()}
  if(!me&&updOff){updOff();updOff=null;updCur=null;hideUpd()}
  adminUpdCard();updCheck();
