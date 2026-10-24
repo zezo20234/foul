@@ -1,0 +1,9 @@
+{
+  "appId": "com.yourname.studytogether",
+  "appName": "Study Together",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#f7f7f5"
+  }
+}
