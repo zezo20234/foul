@@ -27,6 +27,7 @@ xcodegen generate
 
 echo "==> Building (unsigned)"
 rm -rf "$ROOT/build"
+set +e
 xcodebuild \
   -project StudyTogether.xcodeproj \
   -scheme App \
@@ -35,7 +36,16 @@ xcodebuild \
   -destination 'generic/platform=iOS' \
   -derivedDataPath "$ROOT/build" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-  build
+  build > "$ROOT/xcodebuild.log" 2>&1
+STATUS=$?
+set -e
+if [ $STATUS -ne 0 ]; then
+  echo "================ BUILD FAILED: compiler errors ================"
+  grep -E "error:|error :" "$ROOT/xcodebuild.log" | sort -u | head -40 || true
+  echo "================ last 60 log lines ================"
+  tail -60 "$ROOT/xcodebuild.log"
+  exit $STATUS
+fi
 
 APP="$ROOT/build/Build/Products/Release-iphoneos/App.app"
 test -d "$APP"

@@ -14,11 +14,15 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setAlarms(_ call: CAPPluginCall) {
         let raw = call.getArray("alarms") as? [[String: Any]] ?? []
-        let items: [(Date, String)] = raw.compactMap { d in
-            guard let ms = (d["endMs"] as? NSNumber)?.doubleValue else { return nil }
-            return (Date(timeIntervalSince1970: ms / 1000), (d["title"] as? String) ?? "Study timer")
-        }.sorted { $0.0 < $1.0 }
-        Task { await self.apply(items) }
+        var items: [(Date, String)] = []
+        for d in raw {
+            guard let ms = (d["endMs"] as? NSNumber)?.doubleValue else { continue }
+            let title = (d["title"] as? String) ?? "Study timer"
+            items.append((Date(timeIntervalSince1970: ms / 1000), title))
+        }
+        items.sort { $0.0 < $1.0 }
+        let sorted = items
+        Task { await self.apply(sorted) }
         call.resolve(["scheduled": false])
     }
 

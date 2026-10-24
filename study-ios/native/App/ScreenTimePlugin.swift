@@ -37,14 +37,14 @@ public class ScreenTimePlugin: CAPPlugin, CAPBridgedPlugin {
     private let store = ManagedSettingsStore()
     private let key = "st_selection_v1"
 
-    private func load() -> FamilyActivitySelection {
+    private func loadSelection() -> FamilyActivitySelection {
         guard let data = UserDefaults.standard.data(forKey: key),
               let sel = try? PropertyListDecoder().decode(FamilyActivitySelection.self, from: data)
         else { return FamilyActivitySelection() }
         return sel
     }
 
-    private func save(_ sel: FamilyActivitySelection) {
+    private func saveSelection(_ sel: FamilyActivitySelection) {
         if let data = try? PropertyListEncoder().encode(sel) {
             UserDefaults.standard.set(data, forKey: key)
         }
@@ -68,7 +68,7 @@ public class ScreenTimePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func getStatus(_ call: CAPPluginCall) {
-        var out = counts(load())
+        var out = counts(loadSelection())
         out["authorized"] = AuthorizationCenter.shared.authorizationStatus == .approved
         call.resolve(out)
     }
@@ -80,8 +80,8 @@ public class ScreenTimePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             var host: UIHostingController<PickerScreen>?
-            host = UIHostingController(rootView: PickerScreen(selection: self.load()) { sel in
-                self.save(sel)
+            host = UIHostingController(rootView: PickerScreen(selection: self.loadSelection()) { sel in
+                self.saveSelection(sel)
                 host?.dismiss(animated: true) {
                     var out = self.counts(sel)
                     out["authorized"] = AuthorizationCenter.shared.authorizationStatus == .approved
@@ -94,11 +94,19 @@ public class ScreenTimePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func startBlocking(_ call: CAPPluginCall) {
-        let sel = load()
-        store.shield.applications = sel.applicationTokens.isEmpty ? nil : sel.applicationTokens
-        store.shield.webDomains = sel.webDomainTokens.isEmpty ? nil : sel.webDomainTokens
-        store.shield.applicationCategories = sel.categoryTokens.isEmpty ? nil : .specific(sel.categoryTokens)
-        store.shield.webDomainCategories = sel.categoryTokens.isEmpty ? nil : .specific(sel.categoryTokens)
+        let sel = loadSelection()
+        let apps: Set<ApplicationToken> = sel.applicationTokens
+        let sites: Set<WebDomainToken> = sel.webDomainTokens
+        let cats: Set<ActivityCategoryToken> = sel.categoryTokens
+        if apps.isEmpty { store.shield.applications = nil } else { store.shield.applications = apps }
+        if sites.isEmpty { store.shield.webDomains = nil } else { store.shield.webDomains = sites }
+        if cats.isEmpty {
+            store.shield.applicationCategories = nil
+            store.shield.webDomainCategories = nil
+        } else {
+            store.shield.applicationCategories = ShieldSettings.ActivityCategoryPolicy<Application>.specific(cats)
+            store.shield.webDomainCategories = ShieldSettings.ActivityCategoryPolicy<WebDomain>.specific(cats)
+        }
         call.resolve()
     }
 
